@@ -43,6 +43,15 @@ set(handles.Global_View,'YTick',[]);
 set(handles.Sub_View,'XTick',[]);
 set(handles.Sub_View,'YTick',[]);
 
+%% Output Function
+function varargout=VisualEEG_OutputFcn(hObject, eventdata, handles, varargin)
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to VisualEEG (see VARARGIN)
+
+varargout{1} = handles.output;
+
 
 %% Callback for Global_View_Selection (win_loc)
 function Global_View_Selection_Callback(hObject, eventdata, handles)
