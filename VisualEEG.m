@@ -26,10 +26,12 @@ function VisualEEG_OpeningFcn(hObject, eventdata, handles, varargin)
 
 handles.output = hObject;
 
-set(0,'Units','characters')
+set(0,'Units','normalized')
 f=gcf;
-set(f,'units','characters','position',[1450 712 1194 686])
+set(f,'units','norm','position',[0 0 1 1])
 h=get(gcf,'Children');
+h1=findobj(h,'FontUnits','points');
+set(h1,'FontUnits','norm');
 
 % Appdata initialization
 handles.time=[];
