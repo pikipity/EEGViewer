@@ -26,6 +26,13 @@ function VisualEEG_OpeningFcn(hObject, eventdata, handles, varargin)
 
 handles.output = hObject;
 
+set(0,'Units','normalized')
+f=gcf;
+set(f,'units','norm','position',[0 0 1 1])
+h=get(gcf,'Children');
+h1=findobj(h,'FontUnits','points');
+set(h1,'FontUnits','norm');
+
 % Appdata initialization
 handles.time=[];
 handles.EEG=[];
@@ -34,9 +41,6 @@ handles.ch=1;
 handles.win_loc=[];
 % handles.yrange=[];
 
-% Update handles structure
-guidata(hObject, handles);
-
 % clear 3 views
 set(handles.Global_View,'XTick',[]);
 set(handles.Global_View,'YTick',[]);
@@ -44,6 +48,9 @@ set(handles.Sub_View,'XTick',[]);
 set(handles.Sub_View,'YTick',[]);
 set(handles.Freq_View,'XTick',[]);
 set(handles.Freq_View,'YTick',[]);
+
+% Update handles structure
+guidata(hObject, handles);
 
 %% Output Function
 function varargout=VisualEEG_OutputFcn(hObject, eventdata, handles, varargin)
