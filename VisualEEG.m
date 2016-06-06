@@ -34,6 +34,7 @@ handles.win=[];
 handles.ch=1;
 handles.win_loc=[];
 % handles.yrange=[];
+handles.filepath=[];
 
 % clear 3 views
 set(handles.Global_View,'XTick',[]);
@@ -125,9 +126,16 @@ function LoadDataButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % get EEG data
-[Filename,Filepath]=uigetfile('*.mat',...
+if isempty(handles.filepath)
+    [Filename,Filepath]=uigetfile('*.mat',...
                                   'Select Matlab Data',...
                                   'MultiSelect','off');
+else
+    [Filename,Filepath]=uigetfile('*.mat',...
+                                  'Select Matlab Data',...
+                                  handles.filepath,...
+                                  'MultiSelect','off');
+end
 
 error=0;
 datafile=[Filepath Filename];
@@ -136,6 +144,7 @@ if Filename~=0
         [~,~,fileextension]=fileparts(datafile);
         if strcmp(fileextension,'.mat')
             try
+                handles.filepath=Filepath;
                 handles.EEG=load(datafile,'y');
                 handles.EEG=handles.EEG.y;
                 handles.time=handles.EEG(1,:); % time
