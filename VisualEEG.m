@@ -49,6 +49,9 @@ set(handles.Sub_View,'YTick',[]);
 set(handles.Freq_View,'XTick',[]);
 set(handles.Freq_View,'YTick',[]);
 
+% button color
+set(handles.LoadDataButton,'backgroundcolor',[0.94 0.94 0.94]);
+
 % Update handles structure
 guidata(hObject, handles);
 
