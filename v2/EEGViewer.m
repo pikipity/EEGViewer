@@ -43,6 +43,47 @@ else
 end
 % End initialization code - DO NOT EDIT
 
+% Get Wavelets
+function [WaveletFam,WaveletNames]=GetWavelets(varargin)
+OUT=wavemngr('read');
+WaveletFam={};
+num=1;
+for i=1:size(OUT,1)
+    if isempty(strfind(OUT(i,:),'==='))
+        C=strsplit(OUT(i,:),' ');
+        C=C{2};
+        C(C==' ')=[];
+        WaveletFam{num}=(C);
+        num=num+1;
+    end
+end
+OUT=wavemngr('read',1);
+WaveletNames={};
+num=1;
+s=0;
+for i=1:size(OUT,1)
+    if s==1
+        C=strsplit(OUT(i,:),' ');
+        C=C{1};
+        C=strsplit(C,'\t');
+        for k=1:length(C)-1
+            if isempty(strfind(C{k},'*')) && isempty(strfind(C{k},'cmor')) &&...
+               isempty(strfind(C{k},'fbsp')) &&...
+               isempty(strfind(C{k},'shan')) &&...
+               isempty(strfind(C{k},'cgau')) &&...
+               isempty(strfind(C{k},'gaus'))
+                WaveletNames{num}=C{k};
+                num=num+1;
+            end
+        end
+    end
+    if ~isempty(strfind(OUT(i,:),'---'))
+        s=1;
+    elseif ~isempty(strfind(OUT(i,:),'==='))
+        s=0;
+    end
+end
+
 
 % --- Executes just before EEGViewer is made visible.
 function EEGViewer_OpeningFcn(hObject, eventdata, handles, varargin)
@@ -63,7 +104,24 @@ handles.win_loc=[];
 handles.datapath=[];
 handles.datafile=[];
 
-
+% Wavelet Parameters
+set(handles.WaveletFilterThresholdSelection,'string',{'rigrsure',...
+                                                      'heursure' ,...
+                                                      'sqtwolog',...
+                                                      'minimaxi'});
+set(handles.WaveletFilterThresholdSelection,'value',3);
+set(handles.WaveletThresholdTypeSelection,'string',{'h','s'});
+set(handles.WaveletThresholdTypeSelection,'value',1);
+set(handles.WaveletFilterRescaleSelection,'string',{'one','sln','mln'});
+set(handles.WaveletFilterRescaleSelection,'value',3);
+[~,WaveletNames]=GetWavelets;
+set(handles.WaveletFilterSelection,'string',WaveletNames);
+for i=1:length(WaveletNames)
+    if ~isempty(strfind(WaveletNames{i},'bior4.4'))
+        break;
+    end
+end
+set(handles.WaveletFilterSelection,'value',i);
 
 % clear 3 views
 set(handles.Global_View,'XTick',[]);
@@ -359,6 +417,98 @@ handles=UpdateFuc_WinLen_Slide(handles);
 % change Syn Signal Selction
 handles=UpdateFuc_SynSignalSelection(handles);
 
+% Wavelet Filter
+function [FilterWholeSig,FilterWindowSig,handles,error]=WaveletFilter(WholeSig,WindowSig,handles)
+% get filter parameter
+error=0;
+wavelet_flag=get(handles.WaveletFilter_Flag,'value');
+list=get(handles.WaveletFilterSelection,'string');
+wname=list{get(handles.WaveletFilterSelection,'value')};
+list=get(handles.WaveletFilterThresholdSelection,'string');
+thr=list{get(handles.WaveletFilterThresholdSelection,'value')};
+list=get(handles.WaveletThresholdTypeSelection,'string');
+thrtype=list{get(handles.WaveletThresholdTypeSelection,'value')};
+list=get(handles.WaveletFilterRescaleSelection,'string');
+rescale=list{get(handles.WaveletFilterRescaleSelection,'value')};
+level=str2num(get(handles.WaveletFilterLevelInput,'string'));
+
+if wavelet_flag==0
+    error=1;
+    set(handles.WaveletFilterState,'string','Not Active');
+else
+    if isempty(level)
+        wavelet_flag=0;
+        error=5;
+        set(handles.WaveletFilterState,'string','unsuitable Level');
+    else
+        level=floor(level);
+        if level<=0
+            wavelet_flag=0;
+            error=2;
+            set(handles.WaveletFilterState,'string','Too small Level');
+        end
+    end
+end
+
+sub_error=[0,0];
+
+if wavelet_flag==1 && get(handles.FilterToWholeSignal,'value')
+    if level>=wmaxlev(length(WholeSig),wname)
+        error=3;
+        set(handles.WaveletFilterState,'string','Too large Level for whole signal');
+        FilterWholeSig=WholeSig;
+        sub_error(1)=1;
+    else
+        try
+            [remove,~,~]=wden(WholeSig,thr,thrtype,rescale,level,wname);
+            FilterWholeSig=WholeSig-remove;
+            set(handles.WaveletFilterState,'string','Active');
+        catch err
+            error=100;
+            set(handles.WaveletFilterState,'string','wname is invalid');
+            FilterWholeSig=WholeSig;
+            sub_error(1)=1;
+        end
+    end
+else
+    FilterWholeSig=WholeSig;
+    sub_error(1)=1;
+end
+
+if wavelet_flag==1 && get(handles.FilterToWindowSignal,'value')
+    if level>=wmaxlev(length(WindowSig),wname)
+        error=4;
+        set(handles.FilterToWindowSignal,'string','Too large Level for windowed signal');
+        FilterWindowSig=WindowSig;
+        sub_error(2)=1;
+    else
+        try
+            [remove,~,~]=wden(WindowSig,thr,thrtype,rescale,level,wname);
+            FilterWindowSig=WindowSig-remove;
+            set(handles.WaveletFilterState,'string','Active');
+        catch err
+            error=100;
+            set(handles.WaveletFilterState,'string','wname is invalid');
+            FilterWindowSig=WindowSig;
+            sub_error(1)=1;
+        end
+    end
+else
+    FilterWindowSig=WindowSig;
+    sub_error(2)=1;
+end
+
+if sum(sub_error)==2
+    wavelet_flag=0;
+end
+
+set(handles.WaveletFilter_Flag,'value',wavelet_flag);
+if ~isempty(level)
+    set(handles.WaveletFilterLevelInput,'string',num2str(level));
+end
+
+
+
 % Butterworth Filter
 function [FilterWholeSig,FilterWindowSig,handles,error]=ButterworthFilter(WholeSig,WindowSig,handles)
 % get filter parameter
@@ -367,27 +517,30 @@ butter_flag=get(handles.ButterWorthFilter_Flag,'value');
 butter_order=str2num(get(handles.FilterParameter1_Input,'string'));
 low_cutoff_f=str2num(get(handles.FilterParameter2_Input,'string'));
 high_cutoff_f=str2num(get(handles.FilterParameter3_Input,'string'));
+Fs=1/(handles.time(3)-handles.time(2));
 
 if butter_flag==0
+    set(handles.ButterworthFilterState,'string','Not Active');
     error=1;
 else
     if isempty(butter_order) || isempty(low_cutoff_f) || isempty(high_cutoff_f)||...
-            (low_cutoff_f<=0 && high_cutoff_f>=Fs/2)
+            (low_cutoff_f<=0 && high_cutoff_f>=Fs/2) || low_cutoff_f>=high_cutoff_f
         butter_flag=0;
         if isempty(butter_order)
-            butter_order='Integer Order';
             error=2;
-        end
-        if isempty(low_cutoff_f)
-            low_cutoff_f='Freq in Hz';
+            set(handles.ButterworthFilterState,'string','Unsuitable Order');
+        elseif isempty(low_cutoff_f)
             error=3;
-        end
-        if isempty(high_cutoff_f)
-            high_cutoff_f='Freq in Hz';
+            set(handles.ButterworthFilterState,'string','Unsuitable Low Freq');
+        elseif isempty(high_cutoff_f)
             error=4;
-        end
-        if low_cutoff_f<=0 && high_cutoff_f>=Fs/2
+            set(handles.ButterworthFilterState,'string','Unsuitable High Freq');
+        elseif low_cutoff_f<=0 && high_cutoff_f>=Fs/2
             error=5;
+            set(handles.ButterworthFilterState,'string','Not Active');
+        elseif low_cutoff_f>=high_cutoff_f
+            error=11;
+            set(handles.ButterworthFilterState,'string','Low Freq must lower than High Freq');
         end
     else
         butter_flag=1;
@@ -395,12 +548,11 @@ else
         if butter_order>500
             butter_flag=0;
             error=6;
-        elseif length(WholeSig)>3*butter_order
+            set(handles.ButterworthFilterState,'string','Too large Order');
+        elseif butter_order<=0
             butter_flag=0;
-            error=7;
-        elseif length(WholeSig)>3*butter_order
-            butter_flag=0;
-            error=8;
+            error=12;
+            set(handles.ButterworthFilterState,'string','Too small Order');
         else
             if high_cutoff_f>=Fs/2
                 butter_type='high';
@@ -417,122 +569,100 @@ else
 end
 
 % filter signal
-if get(handles.FilterToWholeSignal,'value')
+sub_error=[0,0];
+if get(handles.FilterToWholeSignal,'value') && butter_flag
+    if length(WholeSig)<=3*butter_order
+        error=7;
+        set(handles.ButterworthFilterState,'string','Too large Order for whole signal');
+        FilterWholeSig=WholeSig;
+        sub_error(1)=1;
+    else
+        FilterWholeSig=filtfilt(butter_b,butter_a,WholeSig);
+        if sum(isnan(FilterWholeSig))>0
+            FilterWholeSig=WholeSig;
+            sub_error(1)=1;
+            error=9;
+            set(handles.ButterworthFilterState,'string','NaN in filtered whole signal');
+        else
+            set(handles.ButterworthFilterState,'string','Active');
+        end
+    end
 else
-    error=
+    FilterWholeSig=WholeSig;
+    sub_error(1)=1;
+end
+
+if get(handles.FilterToWindowSignal,'value') && butter_flag
+    if length(WindowSig)<=3*butter_order
+        error=7;
+        set(handles.ButterworthFilterState,'string','Too large Order for windowed signal');
+        FilterWindowSig=WindowSig;
+        sub_error(2)=1;
+    else
+        FilterWindowSig=filtfilt(butter_b,butter_a,WindowSig);
+        if sum(isnan(FilterWindowSig))>0
+            FilterWindowSig=WindowSig;
+            error=10;
+            sub_error(2)=1;
+            set(handles.ButterworthFilterState,'string','NaN in filtered windowed signal');
+        end
+    end
+else
+    FilterWindowSig=WindowSig;
+    sub_error(2)=1;
+end
+
+if sum(sub_error)==2
+    butter_flag=0;
 end
 
 set(handles.ButterWorthFilter_Flag,'value',butter_flag);
-set(handles.FilterParameter1_Input,'string',num2str(butter_order));
-set(handles.FilterParameter2_Input,'string',num2str(low_cutoff_f));
-set(handles.FilterParameter3_Input,'string',num2str(high_cutoff_f));
+if ~isempty(butter_order)
+    set(handles.FilterParameter1_Input,'string',num2str(butter_order));
+end
+if ~isempty(low_cutoff_f)
+    set(handles.FilterParameter2_Input,'string',num2str(low_cutoff_f));
+end
+if ~isempty(high_cutoff_f)
+    set(handles.FilterParameter3_Input,'string',num2str(high_cutoff_f));
+end
+
+
+% Get Signals
+function [WholeTime,WindowTime,Fs,WholeSig,WindowSig,win_len,win_loc,ch,handles]=GetSig(handles)
+WholeTime=handles.time;
+Fs=1/(handles.time(3)-handles.time(2));
+win_len=handles.win;
+win_loc=handles.win_loc;
+ch=handles.ch;
+WholeSig=handles.EEG(ch,:);
+WindowTime=handles.time(win_loc:win_loc+win_len-1);
+WindowSig=handles.EEG(ch,win_loc:win_loc+win_len-1);
 
 
 % Plot EEG
 function handles=PlotEEG(handles)
-
 % get data
-time=handles.time;
-Fs=1/(time(3)-time(2));
-win_len=handles.win;
-win_loc=handles.win_loc;
-ch=handles.ch;
-EEG=handles.EEG(ch,:);
-% yrange=handles.yrange;
+[time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+% detrend
 detrend_flag=get(handles.Detrend,'Value');
-
-% get filter parameter
-butter_order=str2num(get(handles.FilterParameter1_Input,'string'));
-low_cutoff_f=str2num(get(handles.FilterParameter2_Input,'string'));
-high_cutoff_f=str2num(get(handles.FilterParameter3_Input,'string'));
-if isempty(butter_order) || isempty(low_cutoff_f) || isempty(high_cutoff_f)||...
-        (low_cutoff_f<=0 && high_cutoff_f>=Fs/2)
-    butter_flag=0;
-    if isempty(butter_order)
-        butter_order='Integer Order';
-    end
-    if isempty(low_cutoff_f)
-        low_cutoff_f='Freq in Hz';
-    end
-    if isempty(high_cutoff_f)
-        high_cutoff_f='Freq in Hz';
-    end
-else
-    butter_flag=1;
-    butter_order=floor(butter_order);
-    if high_cutoff_f>=Fs/2
-        butter_type='high';
-        try
-            [butter_b,butter_a]=butter(butter_order,low_cutoff_f/(Fs/2),butter_type);
-        catch err
-            butter_flag=0;
-            butter_order='Unsuitable';
-        end
-    elseif low_cutoff_f<=0
-        butter_type='low';
-        try
-            [butter_b,butter_a]=butter(butter_order,high_cutoff_f/(Fs/2),butter_type);
-        catch err
-            butter_flag=0;
-            butter_order='Unsuitable';
-        end
-    else
-        butter_type='bandpass';
-        try
-            [butter_b,butter_a]=butter(butter_order,[low_cutoff_f high_cutoff_f]./(Fs/2),butter_type);
-        catch err
-            butter_flag=0;
-            butter_order='Unsuitable';
-        end
-    end
+if detrend_flag && get(handles.FilterToWholeSignal,'value')
+    EEG=detrend(EEG);
 end
-
-set(handles.FilterParameter1_Input,'string',num2str(butter_order));
-set(handles.FilterParameter2_Input,'string',num2str(low_cutoff_f));
-set(handles.FilterParameter3_Input,'string',num2str(high_cutoff_f));
+if detrend_flag && get(handles.FilterToWindowSignal,'value')
+    sub_EEG=detrend(sub_EEG);
+end
+% wavelet filter
+[EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+% butterworth filter
+[EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
 
 
 % plot global view
 hold(handles.Global_View,'off');
-if detrend_flag
-    plot_EEG=detrend(EEG);
-else
-    plot_EEG=EEG;
-end
-if butter_flag
-    try
-        temp=filtfilt(butter_b,butter_a,plot_EEG);
-    catch err
-        temp=NaN;
-    end
-    if sum(isnan(temp))>0
-        set(handles.FilterParameter1_Input,'string','Unsuitable');
-        butter_flag=0;
-    else
-        plot_EEG=temp;
-    end
-end
-plot(time,plot_EEG,'b','parent',handles.Global_View,'linewidth',3);
+plot(time,EEG,'b','parent',handles.Global_View,'linewidth',3);
 
 % plot sub view
-sub_time=time(win_loc:win_loc+win_len-1);
-sub_EEG=EEG(win_loc:win_loc+win_len-1);
-if detrend_flag
-    sub_EEG=detrend(sub_EEG);
-end
-if butter_flag
-    try
-        temp=filtfilt(butter_b,butter_a,sub_EEG);
-    catch err
-        temp=NaN;
-    end
-    if sum(isnan(temp))>0
-        set(handles.FilterParameter1_Input,'string','Unsuitable');
-        butter_flag=0;
-    else
-        sub_EEG=temp;
-    end
-end
 hold(handles.Sub_View,'off');
 plot(sub_time,sub_EEG,'b','parent',handles.Sub_View);
 set(handles.Sub_View,'XLim',[sub_time(1) sub_time(end)]);
@@ -540,17 +670,6 @@ if min(sub_EEG)~=max(sub_EEG)
     set(handles.Sub_View,'YLim',[min(sub_EEG) max(sub_EEG)]);
 end
 xlabel('Time (s)','parent',handles.Sub_View);
-if butter_flag
-    if strcmp(butter_type,'high')
-        ylabel('With Highpass Filter','parent',handles.Sub_View);
-    elseif strcmp(butter_type,'low')
-        ylabel('With Lowpass Filter','parent',handles.Sub_View);
-    elseif strcmp(butter_type,'bandpass')
-        ylabel('With Bandpass Filter','parent',handles.Sub_View);
-    end
-else
-    ylabel('No Butter Filter','parent',handles.Sub_View);
-end
 
 % plot red window
 hold(handles.Global_View,'on');
@@ -794,7 +913,11 @@ function WaveletFilter_Flag_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of WaveletFilter_Flag
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes on selection change in WaveletFilterSelection.
 function WaveletFilterSelection_Callback(hObject, eventdata, handles)
@@ -804,7 +927,11 @@ function WaveletFilterSelection_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns WaveletFilterSelection contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from WaveletFilterSelection
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function WaveletFilterSelection_CreateFcn(hObject, eventdata, handles)
@@ -827,7 +954,11 @@ function WaveletFilterThresholdSelection_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns WaveletFilterThresholdSelection contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from WaveletFilterThresholdSelection
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function WaveletFilterThresholdSelection_CreateFcn(hObject, eventdata, handles)
@@ -850,7 +981,11 @@ function WaveletThresholdTypeSelection_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns WaveletThresholdTypeSelection contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from WaveletThresholdTypeSelection
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function WaveletThresholdTypeSelection_CreateFcn(hObject, eventdata, handles)
@@ -872,7 +1007,11 @@ function ButterWorthFilter_Flag_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of ButterWorthFilter_Flag
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes on selection change in WaveletFilterRescaleSelection.
 function WaveletFilterRescaleSelection_Callback(hObject, eventdata, handles)
@@ -882,7 +1021,11 @@ function WaveletFilterRescaleSelection_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns WaveletFilterRescaleSelection contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from WaveletFilterRescaleSelection
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function WaveletFilterRescaleSelection_CreateFcn(hObject, eventdata, handles)
@@ -905,7 +1048,11 @@ function WaveletFilterLevelInput_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of WaveletFilterLevelInput as text
 %        str2double(get(hObject,'String')) returns contents of WaveletFilterLevelInput as a double
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function WaveletFilterLevelInput_CreateFcn(hObject, eventdata, handles)
@@ -927,7 +1074,11 @@ function FilterToWholeSignal_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of FilterToWholeSignal
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes on button press in FilterToWindowSignal.
 function FilterToWindowSignal_Callback(hObject, eventdata, handles)
@@ -936,7 +1087,11 @@ function FilterToWindowSignal_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of FilterToWindowSignal
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
 
+    guidata(hObject,handles);
+end
 
 % --- Executes on button press in PlayMode_Play.
 function PlayMode_Play_Callback(hObject, eventdata, handles)
