@@ -22,7 +22,7 @@ function varargout = EEGViewer(varargin)
 
 % Edit the above text to modify the response to help EEGViewer
 
-% Last Modified by GUIDE v2.5 07-Jun-2016 08:48:01
+% Last Modified by GUIDE v2.5 07-Jun-2016 17:25:26
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -147,7 +147,6 @@ function varargout = EEGViewer_OutputFcn(hObject, eventdata, handles)
 % varargin   command line arguments to EEGViewer (see VARARGIN)
 
 varargout{1} = handles.output;
-
 
 % --- Executes on slider movement.
 function Global_View_Selection_Callback(hObject, eventdata, handles)
@@ -1250,4 +1249,18 @@ if ~isempty(handles.EEG)
     end
     
     guidata(hObject,handles);
+end
+
+
+% --- Executes when user attempts to close figure1.
+function figure1_CloseRequestFcn(hObject, eventdata, handles)
+% hObject    handle to figure1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: delete(hObject) closes the figure
+if handles.playmode==0
+    delete(hObject);
+else
+    errordlg('Please stop play mode first','Error');
 end
