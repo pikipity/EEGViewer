@@ -103,6 +103,7 @@ handles.ch=1;
 handles.win_loc=[];
 handles.datapath=[];
 handles.datafile=[];
+handles.playmode=0;
 
 % Wavelet Parameters
 set(handles.WaveletFilterThresholdSelection,'string',{'rigrsure',...
@@ -133,6 +134,7 @@ set(handles.Freq_View,'YTick',[]);
 
 % button color
 set(handles.LoadDataButton,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.AdjustWindowButton,'backgroundcolor',[0.94 0.94 0.94]);
 
 % Update handles structure
 guidata(hObject, handles);
@@ -222,70 +224,73 @@ function LoadDataButton_Callback(hObject, eventdata, handles)
 % hObject    handle to LoadDataButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+if handles.playmode==0
+    % get EEG data
+    if isempty(handles.datapath)
+        [Filename,Filepath]=uigetfile('*.mat',...
+                                      'Select Matlab Data',...
+                                      'MultiSelect','off');
+    else
+        [Filename,Filepath]=uigetfile('*.mat',...
+                                      'Select Matlab Data',...
+                                      handles.datapath,...
+                                      'MultiSelect','off');
+    end
 
-% get EEG data
-if isempty(handles.datapath)
-    [Filename,Filepath]=uigetfile('*.mat',...
-                                  'Select Matlab Data',...
-                                  'MultiSelect','off');
-else
-    [Filename,Filepath]=uigetfile('*.mat',...
-                                  'Select Matlab Data',...
-                                  handles.datapath,...
-                                  'MultiSelect','off');
-end
-
-error=0;
-datafile=[Filepath Filename];
-if Filename~=0
-    if exist(datafile)
-        [~,~,fileextension]=fileparts(datafile);
-        if strcmp(fileextension,'.mat')
-            try
-                temp=LoadSignal(datafile);
-                EEG_len=length(temp(1,:));
-                if EEG_len<20
-                    errordlg('Length of EEG must be larger than 20.','File Error');
+    error=0;
+    datafile=[Filepath Filename];
+    if Filename~=0
+        if exist(datafile)
+            [~,~,fileextension]=fileparts(datafile);
+            if strcmp(fileextension,'.mat')
+                try
+                    temp=LoadSignal(datafile);
+                    EEG_len=length(temp(1,:));
+                    if EEG_len<20
+                        errordlg('Length of EEG must be larger than 20.','File Error');
+                        error=1;
+                    else
+                        handles.datapath=Filepath;
+                        handles.datafile=Filename;
+                        handles.EEG=LoadSignal(datafile);
+                        handles.time=handles.EEG(1,:); % time
+                        handles.EEG=handles.EEG(2:end,:); % EEG
+                        handles.ch=1; % channel
+                        handles.win_loc=1; % window location
+                        EEG_len=length(handles.time); 
+                        handles.win=floor(EEG_len/2); % window length
+        %               handles.yrange=[min(handles.EEG(handles.ch,1:end)) max(handles.EEG(handles.ch,1:end))];
+                        handles=init_all_control(handles);
+                        % change Syn Index Selection
+                        handles=UpdateFuc_SynStartSignalSelection(handles);
+                        handles=UpdateFuc_SynEndSignalSelection(handles);
+                    end
+                catch err
+                    errordlg('"mat" file must contain "y" for EEG signals','File Error');
                     error=1;
-                else
-                    handles.datapath=Filepath;
-                    handles.datafile=Filename;
-                    handles.EEG=LoadSignal(datafile);
-                    handles.time=handles.EEG(1,:); % time
-                    handles.EEG=handles.EEG(2:end,:); % EEG
-                    handles.ch=1; % channel
-                    handles.win_loc=1; % window location
-                    EEG_len=length(handles.time); 
-                    handles.win=floor(EEG_len/2); % window length
-    %               handles.yrange=[min(handles.EEG(handles.ch,1:end)) max(handles.EEG(handles.ch,1:end))];
-                    handles=init_all_control(handles);
-                    % change Syn Index Selection
-                    handles=UpdateFuc_SynStartSignalSelection(handles);
-                    handles=UpdateFuc_SynEndSignalSelection(handles);
                 end
-            catch err
-                errordlg('"mat" file must contain "y" for EEG signals','File Error');
+            else
+                errordlg('Please select a "mat" file','File Error');
                 error=1;
             end
         else
-            errordlg('Please select a "mat" file','File Error');
+            errordlg('Please select an existed file','File Error');
             error=1;
         end
     else
-        errordlg('Please select an existed file','File Error');
+        % errordlg('Please select one data file','File Error');
         error=1;
     end
+
+    if ~error
+        handles=PlotEEG(handles);
+    end
+
+    % store data
+    guidata(hObject,handles);
 else
-    % errordlg('Please select one data file','File Error');
-    error=1;
+    errordlg('Please stop play mode first.','Error');
 end
-
-if ~error
-    handles=PlotEEG(handles);
-end
-
-% store data
-guidata(hObject,handles);
 
 % Update DataFileOutput
 function handles=UpdateFuc_DataFileOutput(handles)
@@ -1098,13 +1103,43 @@ function PlayMode_Play_Callback(hObject, eventdata, handles)
 % hObject    handle to PlayMode_Play (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+if ~isempty(handles.EEG)
+    handles.playmode=1;
+    set(handles.PlayMode_Play,'enable','off');
+    guidata(hObject,handles);
+    while 1
+        handles=guidata(hObject);
+        if handles.playmode==0
+            set(handles.PlayMode_Play,'enable','on');
+            break;
+        else
+            win_loc=handles.win_loc;
+            win_len=handles.win;
+            time=handles.time;
+            Fs=1/(time(3)-time(2));
+            if win_loc+win_len-1>=length(time)
+                handles.playmode=0;
+            else
+                handles=UpdateFuc_Global_View_Selection(handles);
+                handles=PlotEEG(handles);
+                win_loc=win_loc+ceil(Fs*0.033);
+                handles.win_loc=win_loc;
+            end
+        end
+        guidata(hObject,handles);
+        pause(0.033);
+    end
+end
 
 % --- Executes on button press in PlayMode_Stop.
 function PlayMode_Stop_Callback(hObject, eventdata, handles)
 % hObject    handle to PlayMode_Stop (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    handles.playmode=0;
+    guidata(hObject,handles);
+end
 
 
 % --- Executes on selection change in SynSignalSelection.
