@@ -22,7 +22,7 @@ function varargout = EEGViewer(varargin)
 
 % Edit the above text to modify the response to help EEGViewer
 
-% Last Modified by GUIDE v2.5 08-Jun-2016 08:30:01
+% Last Modified by GUIDE v2.5 08-Jun-2016 10:57:16
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
