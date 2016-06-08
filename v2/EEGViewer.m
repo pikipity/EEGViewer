@@ -105,6 +105,7 @@ handles.datapath=[];
 handles.datafile=[];
 handles.playmode=0;
 handles.waveletremove={[],[]};
+handles.waveletcomponents={[],[]};
 
 % Wavelet Parameters
 set(handles.WaveletFilterThresholdSelection,'string',{'rigrsure',...
@@ -466,24 +467,37 @@ if wavelet_flag==1 && get(handles.FilterToWholeSignal,'value')
         FilterWholeSig=WholeSig;
         sub_error(1)=1;
         handles.waveletremove{1}=[];
+        handles.waveletcomponents{1}=[];
     else
         try
             [remove,~,~]=wden(WholeSig,thr,thrtype,rescale,level,wname);
             handles.waveletremove{1}=remove;
             FilterWholeSig=WholeSig-remove;
             set(handles.WaveletFilterState,'string','Active');
+            [d,a]=wavedec(WholeSig,level,wname);
+            handles.waveletcomponents{1}=[];
+            for i=1:level
+                if i==level
+                    handles.waveletcomponents{1}(i,:)=wrcoef('d',d,a,wname,i);
+                    handles.waveletcomponents{1}(i+1,:)=wrcoef('a',d,a,wname,i);
+                else
+                    handles.waveletcomponents{1}(i,:)=wrcoef('d',d,a,wname,i);
+                end
+            end
         catch err
             error=100;
             set(handles.WaveletFilterState,'string','wname is invalid');
             FilterWholeSig=WholeSig;
             sub_error(1)=1;
             handles.waveletremove{1}=[];
+            handles.waveletcomponents{1}=[];
         end
     end
 else
     FilterWholeSig=WholeSig;
     sub_error(1)=1;
     handles.waveletremove{1}=[];
+    handles.waveletcomponents{1}=[];
 end
 
 if wavelet_flag==1 && get(handles.FilterToWindowSignal,'value')
@@ -493,24 +507,37 @@ if wavelet_flag==1 && get(handles.FilterToWindowSignal,'value')
         FilterWindowSig=WindowSig;
         sub_error(2)=1;
         handles.waveletremove{2}=[];
+        handles.waveletcomponents{2}=[];
     else
         try
             [remove,~,~]=wden(WindowSig,thr,thrtype,rescale,level,wname);
             handles.waveletremove{2}=remove;
             FilterWindowSig=WindowSig-remove;
             set(handles.WaveletFilterState,'string','Active');
+            [d,a]=wavedec(WindowSig,level,wname);
+            handles.waveletcomponents{2}=[];
+            for i=1:level
+                if i==level
+                    handles.waveletcomponents{2}(i,:)=wrcoef('d',d,a,wname,i);
+                    handles.waveletcomponents{2}(i+1,:)=wrcoef('a',d,a,wname,i);
+                else
+                    handles.waveletcomponents{2}(i,:)=wrcoef('d',d,a,wname,i);
+                end
+            end
         catch err
             error=100;
             set(handles.WaveletFilterState,'string','wname is invalid');
             FilterWindowSig=WindowSig;
             sub_error(1)=1;
             handles.waveletremove{2}=[];
+            handles.waveletcomponents{2}=[];
         end
     end
 else
     FilterWindowSig=WindowSig;
     sub_error(2)=1;
     handles.waveletremove{2}=[];
+    handles.waveletcomponents{2}=[];
 end
 
 if sum(sub_error)==2
@@ -1282,28 +1309,151 @@ function PlotWholeExternal_Callback(hObject, eventdata, handles)
 % hObject    handle to PlotWholeExternal (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    % get data
+    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+    % detrend
+    detrend_flag=get(handles.Detrend,'Value');
+    if detrend_flag && get(handles.FilterToWholeSignal,'value')
+        EEG=detrend(EEG);
+    end
+    if detrend_flag && get(handles.FilterToWindowSignal,'value')
+        sub_EEG=detrend(sub_EEG);
+    end
+    % wavelet filter
+    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+    % butterworth filter
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
 
+
+    % plot global view
+    figure
+    plot(time,EEG,'b');
+    if max(EEG)==min(EEG)
+        axis([time(1) time(end) min(EEG)-1 max(EEG)+1])
+    else
+        axis([time(1) time(end) min(EEG) max(EEG)])
+    end
+    xlabel('Time (s)');
+    
+    guidata(hObject,handles);
+end
 
 % --- Executes on button press in PlotWindowedExternal.
 function PlotWindowedExternal_Callback(hObject, eventdata, handles)
 % hObject    handle to PlotWindowedExternal (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    % get data
+    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+    % detrend
+    detrend_flag=get(handles.Detrend,'Value');
+    if detrend_flag && get(handles.FilterToWholeSignal,'value')
+        EEG=detrend(EEG);
+    end
+    if detrend_flag && get(handles.FilterToWindowSignal,'value')
+        sub_EEG=detrend(sub_EEG);
+    end
+    % wavelet filter
+    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+    % butterworth filter
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
 
+    % plot sub view
+    figure
+    plot(sub_time,sub_EEG,'b');
+    if min(sub_EEG)==max(sub_EEG)
+        axis([sub_time(1) sub_time(end) min(sub_EEG)-1 max(sub_EEG)+1])
+    else
+        axis([sub_time(1) sub_time(end) min(sub_EEG) max(sub_EEG)])
+    end
+    xlabel('Time (s)');
+end
 
 % --- Executes on button press in SaveWholeSig.
 function SaveWholeSig_Callback(hObject, eventdata, handles)
 % hObject    handle to SaveWholeSig (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+if ~isempty(handles.EEG)
+    y=[];
+    y(1,:)=handles.time;
+    
+    curr_ch=handles.ch;
+    h=waitbar(0,'Please Wait...');
+    for i=1:size(handles.EEG,1)
+        waitbar(i/size(handles.EEG,1),h,['Process Ch ' num2str(i)])
+        
+        handles.ch=i;
+        % get data
+        [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+        % detrend
+        detrend_flag=get(handles.Detrend,'Value');
+        if detrend_flag && get(handles.FilterToWholeSignal,'value')
+            EEG=detrend(EEG);
+        end
+        if detrend_flag && get(handles.FilterToWindowSignal,'value')
+            sub_EEG=detrend(sub_EEG);
+        end
+        % wavelet filter
+        [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+        % butterworth filter
+        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
+        
+        y(i+1,:)=EEG;
+    end
+    close(h)
+    handles.ch=curr_ch;
+    
+    uisave('y',[handles.datapath 'WholeSig.mat']);
+    
+    guidata(hObject,handles);
+end
 
 % --- Executes on button press in SaveWindowSig.
 function SaveWindowSig_Callback(hObject, eventdata, handles)
 % hObject    handle to SaveWindowSig (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+if ~isempty(handles.EEG)
+    y=[];
+    time=handles.time;
+    win_loc=handles.win_loc;
+    win_len=handles.win;
+    time=time(win_loc:win_loc+win_len-1);
+    y(1,:)=time;
+    
+    curr_ch=handles.ch;
+    h=waitbar(0,'Please Wait...');
+    for i=1:size(handles.EEG,1)
+        waitbar(i/size(handles.EEG,1),h,['Process Ch ' num2str(i)])
+        
+        handles.ch=i;
+        % get data
+        [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+        % detrend
+        detrend_flag=get(handles.Detrend,'Value');
+        if detrend_flag && get(handles.FilterToWholeSignal,'value')
+            EEG=detrend(EEG);
+        end
+        if detrend_flag && get(handles.FilterToWindowSignal,'value')
+            sub_EEG=detrend(sub_EEG);
+        end
+        % wavelet filter
+        [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+        % butterworth filter
+        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
+        
+        y(i+1,:)=sub_EEG;
+    end
+    close(h)
+    handles.ch=curr_ch;
+    
+    uisave('y',[handles.datapath 'WindowedSig.mat']);
+    
+    guidata(hObject,handles);
+end
 
 % --- Executes on button press in ButterworthFilterParaCal.
 function ButterworthFilterParaCal_Callback(hObject, eventdata, handles)
@@ -1327,7 +1477,7 @@ function WaveletRemoveWholeSig_Callback(hObject, eventdata, handles)
 if ~isempty(handles.EEG)
     remove=handles.waveletremove{1};
     if isempty(remove)
-        errordlg('Please active wavelet filter first','Error');
+        errordlg('Please active wavelet filter for the whole signal, first','Error');
     else
         time=handles.time;
         figure;
@@ -1335,7 +1485,11 @@ if ~isempty(handles.EEG)
         hold on
         grid on
         xlabel('Times (s)')
-        axis([time(1) time(end) min(remove) max(remove)])
+        if min(remove)==max(remove)
+            axis([time(1) time(end) min(remove)-1 max(remove)+1])
+        else
+            axis([time(1) time(end) min(remove) max(remove)])
+        end
     end
     
     guidata(hObject,handles);
@@ -1351,7 +1505,7 @@ function WaveletRemoveWindowSig_Callback(hObject, eventdata, handles)
 if ~isempty(handles.EEG)
     remove=handles.waveletremove{2};
     if isempty(remove)
-        errordlg('Please active wavelet filter first','Error');
+        errordlg('Please active wavelet filter for the windowed signal, first','Error');
     else
         time=handles.time;
         win_loc=handles.win_loc;
@@ -1362,7 +1516,11 @@ if ~isempty(handles.EEG)
         hold on
         grid on
         xlabel('Times (s)')
-        axis([time(1) time(end) min(remove) max(remove)])
+        if min(remove)==max(remove)
+            axis([time(1) time(end) min(remove)-1 max(remove)+1])
+        else
+            axis([time(1) time(end) min(remove) max(remove)])
+        end
     end
     
     guidata(hObject,handles);
@@ -1373,17 +1531,124 @@ function WaveletCompWholeSig_Callback(hObject, eventdata, handles)
 % hObject    handle to WaveletCompWholeSig (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+if ~isempty(handles.EEG)
+    components=handles.waveletcomponents{1};
+    if isempty(components)
+        errordlg('Please active wavelet filter for the whole signal, first','Error');
+    else
+        time=handles.time;
+        figure;
+        N=size(components,1);
+        row=ceil(N/3);
+        for i=1:N
+            subplot(row,3,i)
+            plot(time,components(i,:),'b')
+            if min(components(i,:))==max(components(i,:))
+                axis([time(1) time(end) min(components(i,:))-1 max(components(i,:))+1])
+            else
+                axis([time(1) time(end) min(components(i,:)) max(components(i,:))])
+            end
+            xlabel('Time (s)')
+            if i==N
+                ylabel('Reminder')
+            else
+                ylabel(['Level ' num2str(i)])
+            end
+        end
+    end
+    
+    guidata(hObject,handles)
+end
 
 % --- Executes on button press in WaveletCompWindowSig.
 function WaveletCompWindowSig_Callback(hObject, eventdata, handles)
 % hObject    handle to WaveletCompWindowSig (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+if ~isempty(handles.EEG)
+    components=handles.waveletcomponents{2};
+    if isempty(components)
+        errordlg('Please active wavelet filter for the windowed signal, first','Error');
+    else
+        time=handles.time;
+        win_loc=handles.win_loc;
+        win_len=handles.win;
+        time=time(win_loc:win_loc+win_len-1);
+        figure;
+        N=size(components,1);
+        row=ceil(N/3);
+        for i=1:N
+            subplot(row,3,i)
+            plot(time,components(i,:),'b')
+            if min(components(i,:))==max(components(i,:))
+                axis([time(1) time(end) min(components(i,:))-1 max(components(i,:))+1])
+            else
+                axis([time(1) time(end) min(components(i,:)) max(components(i,:))])
+            end
+            xlabel('Time (s)')
+            if i==N
+                ylabel('Reminder')
+            else
+                ylabel(['Level ' num2str(i)])
+            end
+        end
+    end
+    
+    guidata(hObject,handles)
+end
 
 % --- Executes on button press in PlotFreqSpec.
 function PlotFreqSpec_Callback(hObject, eventdata, handles)
 % hObject    handle to PlotFreqSpec (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    % get data
+    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+    % detrend
+    detrend_flag=get(handles.Detrend,'Value');
+    if detrend_flag && get(handles.FilterToWholeSignal,'value')
+        EEG=detrend(EEG);
+    end
+    if detrend_flag && get(handles.FilterToWindowSignal,'value')
+        sub_EEG=detrend(sub_EEG);
+    end
+    % wavelet filter
+    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+    % butterworth filter
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
+
+    % plot frequcy view
+    min_freq=str2num(get(handles.Min_Freq,'string'));
+    max_freq=str2num(get(handles.Max_Freq,'string'));
+    L=length(sub_EEG);
+    NFFT=2^nextpow2(L);
+    fft_result=fft(sub_EEG,NFFT)/L;
+    fft_result=fft_result(1:NFFT/2+1);
+    frequency=Fs/2*linspace(0,1,NFFT/2+1);
+    if ~isempty(min_freq)
+        [~,min_f_index]=min(abs(frequency-min_freq));
+    else
+        min_f_index=1;
+    end
+    if ~isempty(max_freq)
+        [~,max_f_index]=min(abs(frequency-max_freq));
+    else
+        max_f_index=length(frequency);
+    end
+    if min_f_index>=max_f_index
+        min_f_index=1;
+        max_f_index=length(frequency);
+    end
+    set(handles.Min_Freq,'string',num2str(frequency(min_f_index)));
+    set(handles.Max_Freq,'string',num2str(frequency(max_f_index)));
+    figure
+    plot(frequency(min_f_index:max_f_index),2.*abs(fft_result(min_f_index:max_f_index)),'b');
+    if min(2.*abs(fft_result))==max(2.*abs(fft_result))
+        axis([frequency(min_f_index) frequency(max_f_index) min(2.*abs(fft_result(min_f_index:max_f_index)))-1 max(2.*abs(fft_result(min_f_index:max_f_index)))+1])
+    else
+        axis([frequency(min_f_index) frequency(max_f_index) min(2.*abs(fft_result(min_f_index:max_f_index))) max(2.*abs(fft_result(min_f_index:max_f_index)))])
+    end
+    xlabel('Frequency (Hz)','parent',handles.Freq_View);
+    ylabel('Amplitudes','parent',handles.Freq_View);
+end
