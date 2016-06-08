@@ -22,7 +22,7 @@ function varargout = EEGViewer(varargin)
 
 % Edit the above text to modify the response to help EEGViewer
 
-% Last Modified by GUIDE v2.5 07-Jun-2016 17:25:26
+% Last Modified by GUIDE v2.5 08-Jun-2016 08:30:01
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -104,6 +104,7 @@ handles.win_loc=[];
 handles.datapath=[];
 handles.datafile=[];
 handles.playmode=0;
+handles.waveletremove={[],[]};
 
 % Wavelet Parameters
 set(handles.WaveletFilterThresholdSelection,'string',{'rigrsure',...
@@ -135,6 +136,8 @@ set(handles.Freq_View,'YTick',[]);
 % button color
 set(handles.LoadDataButton,'backgroundcolor',[0.94 0.94 0.94]);
 set(handles.AdjustWindowButton,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.WaveletRemoveWholeSig,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.WaveletRemoveWindowSig,'backgroundcolor',[0.94 0.94 0.94]);
 
 % Update handles structure
 guidata(hObject, handles);
@@ -462,9 +465,11 @@ if wavelet_flag==1 && get(handles.FilterToWholeSignal,'value')
         set(handles.WaveletFilterState,'string','Too large Level for whole signal');
         FilterWholeSig=WholeSig;
         sub_error(1)=1;
+        handles.waveletremove{1}=[];
     else
         try
             [remove,~,~]=wden(WholeSig,thr,thrtype,rescale,level,wname);
+            handles.waveletremove{1}=remove;
             FilterWholeSig=WholeSig-remove;
             set(handles.WaveletFilterState,'string','Active');
         catch err
@@ -472,22 +477,26 @@ if wavelet_flag==1 && get(handles.FilterToWholeSignal,'value')
             set(handles.WaveletFilterState,'string','wname is invalid');
             FilterWholeSig=WholeSig;
             sub_error(1)=1;
+            handles.waveletremove{1}=[];
         end
     end
 else
     FilterWholeSig=WholeSig;
     sub_error(1)=1;
+    handles.waveletremove{1}=[];
 end
 
 if wavelet_flag==1 && get(handles.FilterToWindowSignal,'value')
     if level>=wmaxlev(length(WindowSig),wname)
         error=4;
-        set(handles.FilterToWindowSignal,'string','Too large Level for windowed signal');
+        set(handles.WaveletFilterState,'string','Too large Level for windowed signal');
         FilterWindowSig=WindowSig;
         sub_error(2)=1;
+        handles.waveletremove{2}=[];
     else
         try
             [remove,~,~]=wden(WindowSig,thr,thrtype,rescale,level,wname);
+            handles.waveletremove{2}=remove;
             FilterWindowSig=WindowSig-remove;
             set(handles.WaveletFilterState,'string','Active');
         catch err
@@ -495,11 +504,13 @@ if wavelet_flag==1 && get(handles.FilterToWindowSignal,'value')
             set(handles.WaveletFilterState,'string','wname is invalid');
             FilterWindowSig=WindowSig;
             sub_error(1)=1;
+            handles.waveletremove{2}=[];
         end
     end
 else
     FilterWindowSig=WindowSig;
     sub_error(2)=1;
+    handles.waveletremove{2}=[];
 end
 
 if sum(sub_error)==2
@@ -1264,3 +1275,115 @@ if handles.playmode==0
 else
     errordlg('Please stop play mode first','Error');
 end
+
+
+% --- Executes on button press in PlotWholeExternal.
+function PlotWholeExternal_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotWholeExternal (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in PlotWindowedExternal.
+function PlotWindowedExternal_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotWindowedExternal (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in SaveWholeSig.
+function SaveWholeSig_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveWholeSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in SaveWindowSig.
+function SaveWindowSig_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveWindowSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in ButterworthFilterParaCal.
+function ButterworthFilterParaCal_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilterParaCal (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in ButterworthFilterFreqRes.
+function ButterworthFilterFreqRes_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilterFreqRes (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in WaveletRemoveWholeSig.
+function WaveletRemoveWholeSig_Callback(hObject, eventdata, handles)
+% hObject    handle to WaveletRemoveWholeSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    remove=handles.waveletremove{1};
+    if isempty(remove)
+        errordlg('Please active wavelet filter first','Error');
+    else
+        time=handles.time;
+        figure;
+        plot(time,remove,'b')
+        hold on
+        grid on
+        xlabel('Times (s)')
+        axis([time(1) time(end) min(remove) max(remove)])
+    end
+    
+    guidata(hObject,handles);
+end
+
+
+
+% --- Executes on button press in WaveletRemoveWindowSig.
+function WaveletRemoveWindowSig_Callback(hObject, eventdata, handles)
+% hObject    handle to WaveletRemoveWindowSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    remove=handles.waveletremove{2};
+    if isempty(remove)
+        errordlg('Please active wavelet filter first','Error');
+    else
+        time=handles.time;
+        win_loc=handles.win_loc;
+        win_len=handles.win;
+        time=time(win_loc:win_loc+win_len-1);
+        figure;
+        plot(time,remove,'b')
+        hold on
+        grid on
+        xlabel('Times (s)')
+        axis([time(1) time(end) min(remove) max(remove)])
+    end
+    
+    guidata(hObject,handles);
+end
+
+% --- Executes on button press in WaveletCompWholeSig.
+function WaveletCompWholeSig_Callback(hObject, eventdata, handles)
+% hObject    handle to WaveletCompWholeSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in WaveletCompWindowSig.
+function WaveletCompWindowSig_Callback(hObject, eventdata, handles)
+% hObject    handle to WaveletCompWindowSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in PlotFreqSpec.
+function PlotFreqSpec_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotFreqSpec (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
