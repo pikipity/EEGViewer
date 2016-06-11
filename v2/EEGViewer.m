@@ -22,7 +22,7 @@ function varargout = EEGViewer(varargin)
 
 % Edit the above text to modify the response to help EEGViewer
 
-% Last Modified by GUIDE v2.5 08-Jun-2016 10:57:16
+% Last Modified by GUIDE v2.5 11-Jun-2016 12:50:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -125,6 +125,18 @@ for i=1:length(WaveletNames)
     end
 end
 set(handles.WaveletFilterSelection,'value',i);
+
+% butterworth parameter
+set(handles.ButterworthFilterType,'string',{'Highpass',...
+                                            'Lowpass',...
+                                            'Bandpass',...
+                                            'Bandstop'});
+set(handles.ButterworthFilterType,'value',3);
+set(handles.ButerworthFilter2Type,'string',{'Highpass',...
+                                            'Lowpass',...
+                                            'Bandpass',...
+                                            'Bandstop'});
+set(handles.ButerworthFilter2Type,'value',4);
 
 % clear 3 views
 set(handles.Global_View,'XTick',[]);
@@ -550,126 +562,6 @@ if ~isempty(level)
 end
 
 
-
-% Butterworth Filter
-function [FilterWholeSig,FilterWindowSig,handles,error]=ButterworthFilter(WholeSig,WindowSig,handles)
-% get filter parameter
-error=0;
-butter_flag=get(handles.ButterWorthFilter_Flag,'value');
-butter_order=str2num(get(handles.FilterParameter1_Input,'string'));
-low_cutoff_f=str2num(get(handles.FilterParameter2_Input,'string'));
-high_cutoff_f=str2num(get(handles.FilterParameter3_Input,'string'));
-Fs=1/(handles.time(3)-handles.time(2));
-
-if butter_flag==0
-    set(handles.ButterworthFilterState,'string','Not Active');
-    error=1;
-else
-    if isempty(butter_order) || isempty(low_cutoff_f) || isempty(high_cutoff_f)||...
-            (low_cutoff_f<=0 && high_cutoff_f>=Fs/2) || low_cutoff_f>=high_cutoff_f
-        butter_flag=0;
-        if isempty(butter_order)
-            error=2;
-            set(handles.ButterworthFilterState,'string','Unsuitable Order');
-        elseif isempty(low_cutoff_f)
-            error=3;
-            set(handles.ButterworthFilterState,'string','Unsuitable Low Freq');
-        elseif isempty(high_cutoff_f)
-            error=4;
-            set(handles.ButterworthFilterState,'string','Unsuitable High Freq');
-        elseif low_cutoff_f<=0 && high_cutoff_f>=Fs/2
-            error=5;
-            set(handles.ButterworthFilterState,'string','Not Active');
-        elseif low_cutoff_f>=high_cutoff_f
-            error=11;
-            set(handles.ButterworthFilterState,'string','Low Freq must lower than High Freq');
-        end
-    else
-        butter_flag=1;
-        butter_order=floor(butter_order);
-        if butter_order>500
-            butter_flag=0;
-            error=6;
-            set(handles.ButterworthFilterState,'string','Too large Order');
-        elseif butter_order<=0
-            butter_flag=0;
-            error=12;
-            set(handles.ButterworthFilterState,'string','Too small Order');
-        else
-            if high_cutoff_f>=Fs/2
-                butter_type='high';
-                [butter_b,butter_a]=butter(butter_order,low_cutoff_f/(Fs/2),butter_type);
-            elseif low_cutoff_f<=0
-                butter_type='low';
-                [butter_b,butter_a]=butter(butter_order,high_cutoff_f/(Fs/2),butter_type);
-            else
-                butter_type='bandpass';
-                [butter_b,butter_a]=butter(butter_order,[low_cutoff_f high_cutoff_f]./(Fs/2),butter_type);
-            end
-        end
-    end
-end
-
-% filter signal
-sub_error=[0,0];
-if get(handles.FilterToWholeSignal,'value') && butter_flag
-    if length(WholeSig)<=3*butter_order
-        error=7;
-        set(handles.ButterworthFilterState,'string','Too large Order for whole signal');
-        FilterWholeSig=WholeSig;
-        sub_error(1)=1;
-    else
-        FilterWholeSig=filtfilt(butter_b,butter_a,WholeSig);
-        if sum(isnan(FilterWholeSig))>0
-            FilterWholeSig=WholeSig;
-            sub_error(1)=1;
-            error=9;
-            set(handles.ButterworthFilterState,'string','NaN in filtered whole signal');
-        else
-            set(handles.ButterworthFilterState,'string','Active');
-        end
-    end
-else
-    FilterWholeSig=WholeSig;
-    sub_error(1)=1;
-end
-
-if get(handles.FilterToWindowSignal,'value') && butter_flag
-    if length(WindowSig)<=3*butter_order
-        error=7;
-        set(handles.ButterworthFilterState,'string','Too large Order for windowed signal');
-        FilterWindowSig=WindowSig;
-        sub_error(2)=1;
-    else
-        FilterWindowSig=filtfilt(butter_b,butter_a,WindowSig);
-        if sum(isnan(FilterWindowSig))>0
-            FilterWindowSig=WindowSig;
-            error=10;
-            sub_error(2)=1;
-            set(handles.ButterworthFilterState,'string','NaN in filtered windowed signal');
-        end
-    end
-else
-    FilterWindowSig=WindowSig;
-    sub_error(2)=1;
-end
-
-if sum(sub_error)==2
-    butter_flag=0;
-end
-
-set(handles.ButterWorthFilter_Flag,'value',butter_flag);
-if ~isempty(butter_order)
-    set(handles.FilterParameter1_Input,'string',num2str(butter_order));
-end
-if ~isempty(low_cutoff_f)
-    set(handles.FilterParameter2_Input,'string',num2str(low_cutoff_f));
-end
-if ~isempty(high_cutoff_f)
-    set(handles.FilterParameter3_Input,'string',num2str(high_cutoff_f));
-end
-
-
 % Get Signals
 function [WholeTime,WindowTime,Fs,WholeSig,WindowSig,win_len,win_loc,ch,handles]=GetSig(handles)
 WholeTime=handles.time;
@@ -697,7 +589,8 @@ end
 % wavelet filter
 [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
 % butterworth filter
-[EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
+[EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter1(EEG,sub_EEG,handles);
+[EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter2(EEG,sub_EEG,handles);
 
 
 % plot global view
@@ -1304,170 +1197,102 @@ else
 end
 
 
-% --- Executes on button press in PlotWholeExternal.
-function PlotWholeExternal_Callback(hObject, eventdata, handles)
-% hObject    handle to PlotWholeExternal (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-if ~isempty(handles.EEG)
-    % get data
-    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
-    % detrend
-    detrend_flag=get(handles.Detrend,'Value');
-    if detrend_flag && get(handles.FilterToWholeSignal,'value')
-        EEG=detrend(EEG);
-    end
-    if detrend_flag && get(handles.FilterToWindowSignal,'value')
-        sub_EEG=detrend(sub_EEG);
-    end
-    % wavelet filter
-    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
-    % butterworth filter
-    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
-
-
-    % plot global view
-    figure
-    plot(time,EEG,'b');
-    if max(EEG)==min(EEG)
-        axis([time(1) time(end) min(EEG)-1 max(EEG)+1])
-    else
-        axis([time(1) time(end) min(EEG) max(EEG)])
-    end
-    xlabel('Time (s)');
-    
-    guidata(hObject,handles);
-end
-
-% --- Executes on button press in PlotWindowedExternal.
-function PlotWindowedExternal_Callback(hObject, eventdata, handles)
-% hObject    handle to PlotWindowedExternal (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-if ~isempty(handles.EEG)
-    % get data
-    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
-    % detrend
-    detrend_flag=get(handles.Detrend,'Value');
-    if detrend_flag && get(handles.FilterToWholeSignal,'value')
-        EEG=detrend(EEG);
-    end
-    if detrend_flag && get(handles.FilterToWindowSignal,'value')
-        sub_EEG=detrend(sub_EEG);
-    end
-    % wavelet filter
-    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
-    % butterworth filter
-    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
-
-    % plot sub view
-    figure
-    plot(sub_time,sub_EEG,'b');
-    if min(sub_EEG)==max(sub_EEG)
-        axis([sub_time(1) sub_time(end) min(sub_EEG)-1 max(sub_EEG)+1])
-    else
-        axis([sub_time(1) sub_time(end) min(sub_EEG) max(sub_EEG)])
-    end
-    xlabel('Time (s)');
-end
-
-% --- Executes on button press in SaveWholeSig.
-function SaveWholeSig_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveWholeSig (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-if ~isempty(handles.EEG)
-    y=[];
-    y(1,:)=handles.time;
-    
-    curr_ch=handles.ch;
-    h=waitbar(0,'Please Wait...');
-    for i=1:size(handles.EEG,1)
-        waitbar(i/size(handles.EEG,1),h,['Process Ch ' num2str(i)])
-        
-        handles.ch=i;
-        % get data
-        [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
-        % detrend
-        detrend_flag=get(handles.Detrend,'Value');
-        if detrend_flag && get(handles.FilterToWholeSignal,'value')
-            EEG=detrend(EEG);
-        end
-        if detrend_flag && get(handles.FilterToWindowSignal,'value')
-            sub_EEG=detrend(sub_EEG);
-        end
-        % wavelet filter
-        [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
-        % butterworth filter
-        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
-        
-        y(i+1,:)=EEG;
-    end
-    close(h)
-    handles.ch=curr_ch;
-    
-    uisave('y',[handles.datapath 'WholeSig.mat']);
-    
-    guidata(hObject,handles);
-end
-
-% --- Executes on button press in SaveWindowSig.
-function SaveWindowSig_Callback(hObject, eventdata, handles)
-% hObject    handle to SaveWindowSig (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-if ~isempty(handles.EEG)
-    y=[];
-    time=handles.time;
-    win_loc=handles.win_loc;
-    win_len=handles.win;
-    time=time(win_loc:win_loc+win_len-1);
-    y(1,:)=time;
-    
-    curr_ch=handles.ch;
-    h=waitbar(0,'Please Wait...');
-    for i=1:size(handles.EEG,1)
-        waitbar(i/size(handles.EEG,1),h,['Process Ch ' num2str(i)])
-        
-        handles.ch=i;
-        % get data
-        [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
-        % detrend
-        detrend_flag=get(handles.Detrend,'Value');
-        if detrend_flag && get(handles.FilterToWholeSignal,'value')
-            EEG=detrend(EEG);
-        end
-        if detrend_flag && get(handles.FilterToWindowSignal,'value')
-            sub_EEG=detrend(sub_EEG);
-        end
-        % wavelet filter
-        [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
-        % butterworth filter
-        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
-        
-        y(i+1,:)=sub_EEG;
-    end
-    close(h)
-    handles.ch=curr_ch;
-    
-    uisave('y',[handles.datapath 'WindowedSig.mat']);
-    
-    guidata(hObject,handles);
-end
-
 % --- Executes on button press in ButterworthFilterParaCal.
 function ButterworthFilterParaCal_Callback(hObject, eventdata, handles)
 % hObject    handle to ButterworthFilterParaCal (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+% set(handles.ButterworthFilterType,'string',{'Highpass',...
+%                                             'Lowpass',...
+%                                             'Bandpass',...
+%                                             'Bandstop'});
+% set(handles.ButterworthFilterType,'value',3);
+if ~isempty(handles.EEG)
+    Fs=1/(handles.time(3)-handles.time(2));
+    result=ButterOrderCalculator(Fs);
+    if ~isempty(result)
+        switch result.type
+            case 'Highpass'
+                set(handles.ButterworthFilterType,'value',1);
+                set(handles.FilterParameter1_Input,'string',num2str(result.order));
+                set(handles.FilterParameter2_Input,'string',num2str(result.lowf));
+                set(handles.FilterParameter2_Input,'enable','on');
+                set(handles.FilterParameter3_Input,'string','inf');
+                set(handles.FilterParameter3_Input,'enable','off');
+            case 'Lowpass'
+                set(handles.ButterworthFilterType,'value',2);
+                set(handles.FilterParameter1_Input,'string',num2str(result.order));
+                set(handles.FilterParameter2_Input,'enable','off');
+                set(handles.FilterParameter2_Input,'string','-inf');
+                set(handles.FilterParameter3_Input,'string',num2str(result.highf));
+                set(handles.FilterParameter3_Input,'enable','on');
+            case 'Bandpass'
+                set(handles.ButterworthFilterType,'value',3);
+                set(handles.FilterParameter1_Input,'string',num2str(result.order));
+                set(handles.FilterParameter2_Input,'string',num2str(result.lowf));
+                set(handles.FilterParameter2_Input,'enable','on');
+                set(handles.FilterParameter3_Input,'string',num2str(result.highf));
+                set(handles.FilterParameter3_Input,'enable','on');
+            case 'Bandstop'
+                set(handles.ButterworthFilterType,'value',4);
+                set(handles.FilterParameter1_Input,'string',num2str(result.order));
+                set(handles.FilterParameter2_Input,'string',num2str(result.lowf));
+                set(handles.FilterParameter2_Input,'enable','on');
+                set(handles.FilterParameter3_Input,'string',num2str(result.highf));
+                set(handles.FilterParameter3_Input,'enable','on');
+        end
+    end
+    
+    handles=PlotEEG(handles);
+    guidata(hObject,handles);
+end
 
 % --- Executes on button press in ButterworthFilterFreqRes.
 function ButterworthFilterFreqRes_Callback(hObject, eventdata, handles)
 % hObject    handle to ButterworthFilterFreqRes (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+if ~isempty(handles.EEG)
+    if get(handles.ButterWorthFilter_Flag,'value')
+        Fs=1/(handles.time(3)-handles.time(2));
+        L=size(handles.EEG,2);
+        NFFT=2^nextpow2(L);
+        frequency=Fs/2*linspace(0,1,NFFT/2+1);
+        butter_order=str2num(get(handles.FilterParameter1_Input,'string'));
+        low_cutoff_f=str2num(get(handles.FilterParameter2_Input,'string'));
+        high_cutoff_f=str2num(get(handles.FilterParameter3_Input,'string'));
+        if high_cutoff_f>=Fs/2
+            butter_type='high';
+            [butter_b,butter_a]=butter(butter_order,low_cutoff_f/(Fs/2),butter_type);
+        elseif low_cutoff_f<=0
+            butter_type='low';
+            [butter_b,butter_a]=butter(butter_order,high_cutoff_f/(Fs/2),butter_type);
+        else
+            butter_type=get(handles.ButterworthFilterType,'string');
+            butter_type=butter_type{get(handles.ButterworthFilterType,'value')};
+            switch butter_type % {'Highpass', 'Lowpass','Bandpass','Bandstop'}
+                case 'Bandpass'
+                    butter_type='bandpass';
+                case 'Bandstop'
+                    butter_type='stop';
+            end
+            [butter_b,butter_a]=butter(butter_order,[low_cutoff_f high_cutoff_f]./(Fs/2),butter_type);
+        end
+        h=freqz(butter_b,butter_a,frequency,Fs);
+        figure;
+        plot(frequency,20*log10(abs(h)),'b')
+        if min(20*log10(abs(h)))==max(20*log10(abs(h)))
+            axis([min(frequency) max(frequency) min(20*log10(abs(h)))-1 max(20*log10(abs(h)))+1])
+        else
+            axis([min(frequency) max(frequency) min(20*log10(abs(h))) max(20*log10(abs(h)))])
+        end
+        xlabel('Frequency (Hz)')
+        ylabel('Magnitude (dB)')
+        grid on
+    else
+        errordlg('Please active Butterworth filter 1 first','Error');
+    end
+end
 
 % --- Executes on button press in WaveletRemoveWholeSig.
 function WaveletRemoveWholeSig_Callback(hObject, eventdata, handles)
@@ -1597,9 +1422,109 @@ if ~isempty(handles.EEG)
     guidata(hObject,handles)
 end
 
-% --- Executes on button press in PlotFreqSpec.
-function PlotFreqSpec_Callback(hObject, eventdata, handles)
-% hObject    handle to PlotFreqSpec (see GCBO)
+
+% --------------------------------------------------------------------
+function SaveData_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveData (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function SaveDataWithoutWindow_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveDataWithoutWindow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    y=[];
+    y(1,:)=handles.time;
+    
+    curr_ch=handles.ch;
+    h=waitbar(0,'Please Wait...');
+    for i=1:size(handles.EEG,1)
+        waitbar(i/size(handles.EEG,1),h,['Process Ch ' num2str(i)])
+        
+        handles.ch=i;
+        % get data
+        [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+        % detrend
+        detrend_flag=get(handles.Detrend,'Value');
+        if detrend_flag && get(handles.FilterToWholeSignal,'value')
+            EEG=detrend(EEG);
+        end
+        if detrend_flag && get(handles.FilterToWindowSignal,'value')
+            sub_EEG=detrend(sub_EEG);
+        end
+        % wavelet filter
+        [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+        % butterworth filter
+        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter1(EEG,sub_EEG,handles);
+        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter2(EEG,sub_EEG,handles);
+        y(i+1,:)=EEG;
+    end
+    close(h)
+    handles.ch=curr_ch;
+    
+    uisave('y',[handles.datapath 'WholeSig.mat']);
+    
+    guidata(hObject,handles);
+end
+
+% --------------------------------------------------------------------
+function SaveDataWithWindow_Callback(hObject, eventdata, handles)
+% hObject    handle to SaveDataWithWindow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    y=[];
+    time=handles.time;
+    win_loc=handles.win_loc;
+    win_len=handles.win;
+    time=time(win_loc:win_loc+win_len-1);
+    y(1,:)=time;
+    
+    curr_ch=handles.ch;
+    h=waitbar(0,'Please Wait...');
+    for i=1:size(handles.EEG,1)
+        waitbar(i/size(handles.EEG,1),h,['Process Ch ' num2str(i)])
+        
+        handles.ch=i;
+        % get data
+        [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+        % detrend
+        detrend_flag=get(handles.Detrend,'Value');
+        if detrend_flag && get(handles.FilterToWholeSignal,'value')
+            EEG=detrend(EEG);
+        end
+        if detrend_flag && get(handles.FilterToWindowSignal,'value')
+            sub_EEG=detrend(sub_EEG);
+        end
+        % wavelet filter
+        [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+        % butterworth filter
+        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter1(EEG,sub_EEG,handles);
+        [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter2(EEG,sub_EEG,handles);
+        y(i+1,:)=sub_EEG;
+    end
+    close(h)
+    handles.ch=curr_ch;
+    
+    uisave('y',[handles.datapath 'WindowedSig.mat']);
+    
+    guidata(hObject,handles);
+end
+
+
+% --------------------------------------------------------------------
+function PlotSig_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function PlotSigWithoutWindow_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotSigWithoutWindow (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if ~isempty(handles.EEG)
@@ -1616,8 +1541,75 @@ if ~isempty(handles.EEG)
     % wavelet filter
     [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
     % butterworth filter
-    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter(EEG,sub_EEG,handles);
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter1(EEG,sub_EEG,handles);
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter2(EEG,sub_EEG,handles);
 
+    % plot global view
+    figure
+    plot(time,EEG,'b');
+    if max(EEG)==min(EEG)
+        axis([time(1) time(end) min(EEG)-1 max(EEG)+1])
+    else
+        axis([time(1) time(end) min(EEG) max(EEG)])
+    end
+    xlabel('Time (s)');
+    
+    guidata(hObject,handles);
+end
+
+% --------------------------------------------------------------------
+function PlotSigWithWindow_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotSigWithWindow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    % get data
+    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+    % detrend
+    detrend_flag=get(handles.Detrend,'Value');
+    if detrend_flag && get(handles.FilterToWholeSignal,'value')
+        EEG=detrend(EEG);
+    end
+    if detrend_flag && get(handles.FilterToWindowSignal,'value')
+        sub_EEG=detrend(sub_EEG);
+    end
+    % wavelet filter
+    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+    % butterworth filter
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter1(EEG,sub_EEG,handles);
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter2(EEG,sub_EEG,handles);
+    % plot sub view
+    figure
+    plot(sub_time,sub_EEG,'b');
+    if min(sub_EEG)==max(sub_EEG)
+        axis([sub_time(1) sub_time(end) min(sub_EEG)-1 max(sub_EEG)+1])
+    else
+        axis([sub_time(1) sub_time(end) min(sub_EEG) max(sub_EEG)])
+    end
+    xlabel('Time (s)');
+end
+
+% --------------------------------------------------------------------
+function PlotSpectrum_Callback(hObject, eventdata, handles)
+% hObject    handle to PlotSpectrum (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    % get data
+    [time,sub_time,Fs,EEG,sub_EEG,win_len,win_loc,ch,handles]=GetSig(handles);
+    % detrend
+    detrend_flag=get(handles.Detrend,'Value');
+    if detrend_flag && get(handles.FilterToWholeSignal,'value')
+        EEG=detrend(EEG);
+    end
+    if detrend_flag && get(handles.FilterToWindowSignal,'value')
+        sub_EEG=detrend(sub_EEG);
+    end
+    % wavelet filter
+    [EEG,sub_EEG,handles,errorwavefilter]=WaveletFilter(EEG,sub_EEG,handles);
+    % butterworth filter
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter1(EEG,sub_EEG,handles);
+    [EEG,sub_EEG,handles,errorbutterfilter]=ButterworthFilter2(EEG,sub_EEG,handles);
     % plot frequcy view
     min_freq=str2num(get(handles.Min_Freq,'string'));
     max_freq=str2num(get(handles.Max_Freq,'string'));
@@ -1651,4 +1643,283 @@ if ~isempty(handles.EEG)
     end
     xlabel('Frequency (Hz)','parent',handles.Freq_View);
     ylabel('Amplitudes','parent',handles.Freq_View);
+end
+
+
+% --- Executes on selection change in ButterworthFilterType.
+function ButterworthFilterType_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilterType (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns ButterworthFilterType contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from ButterworthFilterType
+% {'Highpass', 'Lowpass','Bandpass','Bandstop'}
+list=get(hObject,'string');
+type=list{get(hObject,'value')};
+switch type
+    case 'Highpass'
+        set(handles.FilterParameter2_Input,'enable','on');
+        set(handles.FilterParameter3_Input,'string','inf');
+        set(handles.FilterParameter3_Input,'enable','off');
+    case 'Lowpass'
+        set(handles.FilterParameter2_Input,'enable','off');
+        set(handles.FilterParameter2_Input,'string','-inf');
+        set(handles.FilterParameter3_Input,'enable','on');
+    case 'Bandpass'
+        set(handles.FilterParameter2_Input,'enable','on');
+        set(handles.FilterParameter3_Input,'enable','on');
+    case 'Bandstop'
+        set(handles.FilterParameter2_Input,'enable','on');
+        set(handles.FilterParameter3_Input,'enable','on');
+end
+
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
+end
+
+guidata(hObject,handles);
+
+% --- Executes during object creation, after setting all properties.
+function ButterworthFilterType_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilterType (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in ButerworthFilter2Type.
+function ButerworthFilter2Type_Callback(hObject, eventdata, handles)
+% hObject    handle to ButerworthFilter2Type (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns ButerworthFilter2Type contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from ButerworthFilter2Type
+list=get(hObject,'string');
+type=list{get(hObject,'value')};
+switch type
+    case 'Highpass'
+        set(handles.ButterworthFilter2LowF,'enable','on');
+        set(handles.ButterworthFilter2HighF,'string','inf');
+        set(handles.ButterworthFilter2HighF,'enable','off');
+    case 'Lowpass'
+        set(handles.ButterworthFilter2LowF,'enable','off');
+        set(handles.ButterworthFilter2LowF,'string','-inf');
+        set(handles.ButterworthFilter2HighF,'enable','on');
+    case 'Bandpass'
+        set(handles.ButterworthFilter2LowF,'enable','on');
+        set(handles.ButterworthFilter2HighF,'enable','on');
+    case 'Bandstop'
+        set(handles.ButterworthFilter2LowF,'enable','on');
+        set(handles.ButterworthFilter2HighF,'enable','on');
+end
+
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
+end
+
+guidata(hObject,handles);
+
+% --- Executes during object creation, after setting all properties.
+function ButerworthFilter2Type_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ButerworthFilter2Type (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in ButterworthFilter2FreqResp.
+function ButterworthFilter2FreqResp_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2FreqResp (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    if get(handles.ButterworthFilter2Flag,'value')
+        Fs=1/(handles.time(3)-handles.time(2));
+        L=size(handles.EEG,2);
+        NFFT=2^nextpow2(L);
+        frequency=Fs/2*linspace(0,1,NFFT/2+1);
+        butter_order=str2num(get(handles.ButterworthFilter2Order,'string'));
+        low_cutoff_f=str2num(get(handles.ButterworthFilter2LowF,'string'));
+        high_cutoff_f=str2num(get(handles.ButterworthFilter2HighF,'string'));
+        if high_cutoff_f>=Fs/2
+            butter_type='high';
+            [butter_b,butter_a]=butter(butter_order,low_cutoff_f/(Fs/2),butter_type);
+        elseif low_cutoff_f<=0
+            butter_type='low';
+            [butter_b,butter_a]=butter(butter_order,high_cutoff_f/(Fs/2),butter_type);
+        else
+            butter_type=get(handles.ButerworthFilter2Type,'string');
+            butter_type=butter_type{get(handles.ButerworthFilter2Type,'value')};
+            switch butter_type % {'Highpass', 'Lowpass','Bandpass','Bandstop'}
+                case 'Bandpass'
+                    butter_type='bandpass';
+                case 'Bandstop'
+                    butter_type='stop';
+            end
+            [butter_b,butter_a]=butter(butter_order,[low_cutoff_f high_cutoff_f]./(Fs/2),butter_type);
+        end
+        h=freqz(butter_b,butter_a,frequency,Fs);
+        figure;
+        plot(frequency,20*log10(abs(h)),'b')
+        if min(20*log10(abs(h)))==max(20*log10(abs(h)))
+            axis([min(frequency) max(frequency) min(20*log10(abs(h)))-1 max(20*log10(abs(h)))+1])
+        else
+            axis([min(frequency) max(frequency) min(20*log10(abs(h))) max(20*log10(abs(h)))])
+        end
+        xlabel('Frequency (Hz)')
+        ylabel('Magnitude (dB)')
+        grid on
+    else
+        errordlg('Please active Butterworth filter 2 first','Error');
+    end
+end
+
+% --- Executes on button press in ButterworthFilter2ParaCal.
+function ButterworthFilter2ParaCal_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2ParaCal (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~isempty(handles.EEG)
+    Fs=1/(handles.time(3)-handles.time(2));
+    result=ButterOrderCalculator(Fs);
+    if ~isempty(result)
+        switch result.type
+            case 'Highpass'
+                set(handles.ButerworthFilter2Type,'value',1);
+                set(handles.ButterworthFilter2Order,'string',num2str(result.order));
+                set(handles.ButterworthFilter2LowF,'string',num2str(result.lowf));
+                set(handles.ButterworthFilter2LowF,'enable','on');
+                set(handles.ButterworthFilter2HighF,'string','inf');
+                set(handles.ButterworthFilter2HighF,'enable','off');
+            case 'Lowpass'
+                set(handles.ButerworthFilter2Type,'value',2);
+                set(handles.ButterworthFilter2Order,'string',num2str(result.order));
+                set(handles.ButterworthFilter2LowF,'enable','off');
+                set(handles.ButterworthFilter2LowF,'string','-inf');
+                set(handles.ButterworthFilter2HighF,'string',num2str(result.highf));
+                set(handles.ButterworthFilter2HighF,'enable','on');
+            case 'Bandpass'
+                set(handles.ButerworthFilter2Type,'value',3);
+                set(handles.ButterworthFilter2Order,'string',num2str(result.order));
+                set(handles.ButterworthFilter2LowF,'string',num2str(result.lowf));
+                set(handles.ButterworthFilter2LowF,'enable','on');
+                set(handles.ButterworthFilter2HighF,'string',num2str(result.highf));
+                set(handles.ButterworthFilter2HighF,'enable','on');
+            case 'Bandstop'
+                set(handles.ButerworthFilter2Type,'value',4);
+                set(handles.ButterworthFilter2Order,'string',num2str(result.order));
+                set(handles.ButterworthFilter2LowF,'string',num2str(result.lowf));
+                set(handles.ButterworthFilter2LowF,'enable','on');
+                set(handles.ButterworthFilter2HighF,'string',num2str(result.highf));
+                set(handles.ButterworthFilter2HighF,'enable','on');
+        end
+    end
+    
+    handles=PlotEEG(handles);
+    guidata(hObject,handles);
+end
+
+% --- Executes on button press in ButterworthFilter2Flag.
+function ButterworthFilter2Flag_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2Flag (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of ButterworthFilter2Flag
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
+
+    guidata(hObject,handles);
+end
+
+
+function ButterworthFilter2HighF_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2HighF (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of ButterworthFilter2HighF as text
+%        str2double(get(hObject,'String')) returns contents of ButterworthFilter2HighF as a double
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
+
+    guidata(hObject,handles);
+end
+
+% --- Executes during object creation, after setting all properties.
+function ButterworthFilter2HighF_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2HighF (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function ButterworthFilter2LowF_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2LowF (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of ButterworthFilter2LowF as text
+%        str2double(get(hObject,'String')) returns contents of ButterworthFilter2LowF as a double
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
+
+    guidata(hObject,handles);
+end
+
+% --- Executes during object creation, after setting all properties.
+function ButterworthFilter2LowF_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2LowF (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function ButterworthFilter2Order_Callback(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2Order (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of ButterworthFilter2Order as text
+%        str2double(get(hObject,'String')) returns contents of ButterworthFilter2Order as a double
+if ~isempty(handles.EEG)
+    handles=PlotEEG(handles);
+
+    guidata(hObject,handles);
+end
+
+% --- Executes during object creation, after setting all properties.
+function ButterworthFilter2Order_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to ButterworthFilter2Order (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
 end
