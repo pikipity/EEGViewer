@@ -151,6 +151,15 @@ set(handles.LoadDataButton,'backgroundcolor',[0.94 0.94 0.94]);
 set(handles.AdjustWindowButton,'backgroundcolor',[0.94 0.94 0.94]);
 set(handles.WaveletRemoveWholeSig,'backgroundcolor',[0.94 0.94 0.94]);
 set(handles.WaveletRemoveWindowSig,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.PlayMode_Play,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.PlayMode_Stop,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.WaveletCompWholeSig,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.WaveletCompWindowSig,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.ButterworthFilterParaCal,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.ButterworthFilterFreqRes,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.ButterworthFilter2ParaCal,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.ButterworthFilter2FreqResp,'backgroundcolor',[0.94 0.94 0.94]);
+
 
 % Update handles structure
 guidata(hObject, handles);
