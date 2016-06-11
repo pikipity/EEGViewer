@@ -1,5 +1,5 @@
 # EEGViewer
-A MATLAB program for EEG data visualization.
+A MATLAB program for EEG data visualization, including basic filters and a rectangular window.
 
 ## Screenshot
 ![Screenshot](https://github.com/pikipity/EEGViewer/blob/master/ScreenShot.PNG?raw=true)
