@@ -147,18 +147,18 @@ set(handles.Freq_View,'XTick',[]);
 set(handles.Freq_View,'YTick',[]);
 
 % button color
-set(handles.LoadDataButton,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.AdjustWindowButton,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.WaveletRemoveWholeSig,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.WaveletRemoveWindowSig,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.PlayMode_Play,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.PlayMode_Stop,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.WaveletCompWholeSig,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.WaveletCompWindowSig,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.ButterworthFilterParaCal,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.ButterworthFilterFreqRes,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.ButterworthFilter2ParaCal,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.ButterworthFilter2FreqResp,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.LoadDataButton,'backgroundcolor',[1 1 1]);
+set(handles.AdjustWindowButton,'backgroundcolor',[1 1 1]);
+set(handles.WaveletRemoveWholeSig,'backgroundcolor',[1 1 1]);
+set(handles.WaveletRemoveWindowSig,'backgroundcolor',[1 1 1]);
+set(handles.PlayMode_Play,'backgroundcolor',[1 1 1]);
+set(handles.PlayMode_Stop,'backgroundcolor',[1 1 1]);
+set(handles.WaveletCompWholeSig,'backgroundcolor',[1 1 1]);
+set(handles.WaveletCompWindowSig,'backgroundcolor',[1 1 1]);
+set(handles.ButterworthFilterParaCal,'backgroundcolor',[1 1 1]);
+set(handles.ButterworthFilterFreqRes,'backgroundcolor',[1 1 1]);
+set(handles.ButterworthFilter2ParaCal,'backgroundcolor',[1 1 1]);
+set(handles.ButterworthFilter2FreqResp,'backgroundcolor',[1 1 1]);
 
 
 % Update handles structure
@@ -260,16 +260,20 @@ if handles.playmode==0
                                       handles.datapath,...
                                       'MultiSelect','off');
     end
-
+    waitbarh=waitbar(0,'Loading Data');
     error=0;
     datafile=[Filepath Filename];
+    waitbar(1/6,waitbarh,'Check Selection');
     if Filename~=0
+        waitbar(2/6,waitbarh,'Check Selection');
         if exist(datafile)
             [~,~,fileextension]=fileparts(datafile);
             if strcmp(fileextension,'.mat')
                 try
+                    waitbar(3/6,waitbarh,'Loading');
                     temp=LoadSignal(datafile);
                     EEG_len=length(temp(1,:));
+                    waitbar(4/6,waitbarh,'Check Data Parameters');
                     if EEG_len<20
                         errordlg('Length of EEG must be larger than 20.','File Error');
                         error=1;
@@ -307,11 +311,16 @@ if handles.playmode==0
     end
 
     if ~error
+        waitbar(5/6,waitbarh,'Plot Data');
         handles=PlotEEG(handles);
     end
+    
+    waitbar(6/6,waitbarh,'Finish');
 
     % store data
     guidata(hObject,handles);
+    
+    close(waitbarh);
 else
     errordlg('Please stop play mode first.','Error');
 end

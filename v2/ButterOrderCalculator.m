@@ -67,9 +67,9 @@ set(handles.FilterType,'string',{'Bandpass','Bandstop','Highpass','Lowpass'});
 set(handles.FilterType,'value',1);
 
 % button color
-set(handles.FinishButton,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.CancelButton,'backgroundcolor',[0.94 0.94 0.94]);
-set(handles.PlotFreqResp,'backgroundcolor',[0.94 0.94 0.94]);
+set(handles.FinishButton,'backgroundcolor',[1 1 1]);
+set(handles.CancelButton,'backgroundcolor',[1 1 1]);
+set(handles.PlotFreqResp,'backgroundcolor',[1 1 1]);
 
 handles=CalOrder(handles);
 
@@ -391,7 +391,7 @@ else
                                             set(handles.DataLength,'string',num2str(2*n));
                                             set(handles.StateOutput,'string','Successful Calculation')
                                         catch err
-                                            set(handles.StateOutput,'string','Error')
+                                            set(handles.StateOutput,'string',err.message)
                                             handles.output=[];set(handles.CalResult,'string','...');set(handles.CutoffFrequencyResult,'string','...');set(handles.DataLength,'string','...');
                                         end
                                     end
@@ -447,7 +447,7 @@ else
                                             set(handles.DataLength,'string',num2str(2*n));
                                             set(handles.StateOutput,'string','Successful Calculation')
                                         catch err
-                                            set(handles.StateOutput,'string','Error')
+                                            set(handles.StateOutput,'string',err.message)
                                             handles.output=[];set(handles.CalResult,'string','...');set(handles.CutoffFrequencyResult,'string','...');set(handles.DataLength,'string','...');
                                         end
                                     end
@@ -503,7 +503,7 @@ else
                                             set(handles.DataLength,'string',num2str(n));
                                             set(handles.StateOutput,'string','Successful Calculation')
                                         catch err
-                                            set(handles.StateOutput,'string','Error')
+                                            set(handles.StateOutput,'string',err.message)
                                             handles.output=[];set(handles.CalResult,'string','...');set(handles.CutoffFrequencyResult,'string','...');set(handles.DataLength,'string','...');
                                         end
                                     end
@@ -559,7 +559,7 @@ else
                                             set(handles.DataLength,'string',num2str(n));
                                             set(handles.StateOutput,'string','Successful Calculation')
                                         catch err
-                                            set(handles.StateOutput,'string','Error')
+                                            set(handles.StateOutput,'string',err.message)
                                             handles.output=[];set(handles.CalResult,'string','...');set(handles.CutoffFrequencyResult,'string','...');set(handles.DataLength,'string','...');
                                         end
                                     end
