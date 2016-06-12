@@ -1,11 +1,11 @@
 function Install_EEGViewer
     
     path=fileparts(mfilename('fullpath'));
-    filelist=ls(path);
+    filelist=dir(path);
     temp=[];
     num=1;
-    for i=1:size(filelist,1)
-        file=filelist(i,:);
+    for i=1:length(filelist)
+        file=filelist(i).name;
         file(file==' ')='';
         if file(1)=='v' && length(file)==2
             if ~isempty(str2num(file(2:end)))
