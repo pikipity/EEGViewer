@@ -8,7 +8,7 @@ A MATLAB program for EEG data visualization, including basic filters and a recta
 
 Now, this program is only tested in MATLAB R2015b. You are welcome to test it in other MATLAB versions.
 
-It is only suitable for Windows. For other system, the GUI may not be able to display correctly. 
+It is only suitable for Windows. For other systems, the GUI may not be able to display correctly. But the main functions may still be workable.
 
 ## Installation Steps
 
