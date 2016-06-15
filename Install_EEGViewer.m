@@ -16,6 +16,14 @@ function Install_EEGViewer
     end
     temp=sort(temp);
     file=[path filesep 'v' num2str(temp(end))];
-    addpath(file)
-    savepath;
+    try
+        addpath(file)
+        savepath;
+        disp(['"' file '" has been added in your path.'])
+        disp('Install successfully')
+        disp('Please use the command "EEGViewer" to run this program');
+    catch err
+        disp('Error:')
+        disp(err)
+    end
 end
